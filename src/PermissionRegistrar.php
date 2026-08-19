@@ -60,6 +60,12 @@ class PermissionRegistrar
 
     private bool $isLoadingPermissions = false;
 
+    /**
+     * Bumped whenever the loaded permission collection is (re)loaded or dropped,
+     * so per-request memos elsewhere can detect that permission data changed.
+     */
+    private int $permissionsVersion = 0;
+
     public function __construct(CacheManager $cacheManager)
     {
         $this->permissionClass = config('permission.models.permission');
@@ -145,6 +151,7 @@ class PermissionRegistrar
     {
         $this->permissions = null;
         $this->permissionsLookupIndex = [];
+        $this->permissionsVersion++;
         $this->forgetWildcardPermissionIndex();
 
         return $this->cache->forget($this->cacheKey);
@@ -179,6 +186,7 @@ class PermissionRegistrar
     {
         $this->permissions = null;
         $this->permissionsLookupIndex = [];
+        $this->permissionsVersion++;
         $this->wildcardPermissionsIndex = [];
         $this->isLoadingPermissions = false;
     }
@@ -223,6 +231,7 @@ class PermissionRegistrar
             $this->hydrateRolesCache();
 
             $this->permissions = $this->getHydratedPermissionCollection();
+            $this->permissionsVersion++;
 
             $this->indexPermissionsForLookup();
 
@@ -231,6 +240,15 @@ class PermissionRegistrar
             // Always release the loading flag, even if an exception occurs
             $this->isLoadingPermissions = false;
         }
+    }
+
+    /**
+     * A counter that changes every time the loaded permission collection is
+     * (re)loaded or dropped. Cheap to read; use it to invalidate memoised answers.
+     */
+    public function getPermissionsVersion(): int
+    {
+        return $this->permissionsVersion;
     }
 
     /**
